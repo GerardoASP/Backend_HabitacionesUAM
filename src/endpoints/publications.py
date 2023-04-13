@@ -1,5 +1,6 @@
 from flask import Blueprint,request
 publications = Blueprint("publications",__name__,url_prefix="/api/v1/publications")
+from http import HTTPStatus
 
 @publications.get("/")
 def read_all():
