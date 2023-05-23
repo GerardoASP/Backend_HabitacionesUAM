@@ -1,9 +1,11 @@
 from flask import Blueprint,request
 comments = Blueprint("comments",__name__,url_prefix="/api/v1/comments")
+from http import HTTPStatus
 
 @comments.get("/")
 def read_all():
     return "Reading al comments ... soon"
+
 @comments.get("/<int:id>")
 def read_one(id):
     return "Reading a comment ... soon"
