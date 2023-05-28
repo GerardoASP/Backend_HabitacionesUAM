@@ -1,10 +1,10 @@
 from flask import Flask
 from os import environ
 from src.database import db, ma, migrate
-from src.endpoints.housings import housings
+#from src.endpoints.housings import housings
 from src.endpoints.users import users
-from src.endpoints.publications import publications
-from src.endpoints.comments import comments
+#from src.endpoints.publications import publications
+#from src.endpoints.comments import comments
 
 def create_app():
   app = Flask(__name__, 
@@ -23,10 +23,10 @@ def create_app():
      app.config['ENVIRONMENT'] = "development"
   app.config.from_object(config_class)
   ##Load the blueprints
-  app.register_blueprint(housings)
+  #app.register_blueprint(housings)
   app.register_blueprint(users)
-  app.register_blueprint(publications)
-  app.register_blueprint(comments)
+  #app.register_blueprint(publications)
+  #app.register_blueprint(comments)
   
   db.init_app(app)
   ma.init_app(app)
