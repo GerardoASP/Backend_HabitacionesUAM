@@ -4,7 +4,7 @@ from src.database import db, ma
 from src.models.housing import Housing
 from src.models.publication import Publication
 from src.models.comment import Comment
-from src.roles_and_categories import Roluser
+
 from sqlalchemy.orm import validates
 import re
 
@@ -15,10 +15,13 @@ class User(db.Model):
     email = db.Column(db.String(50), unique=True, nullable=False)
     phone = db.Column(db.String(10), nullable=False)
     dateBirth = db.Column(db.Date,nullable=False)
-    rol_user = db.Column(db.Enum(Roluser),default=Roluser.landlord)
-    housings = db.relationship('Housing', backref="owner")
-    publications = db.relationship('Publication', backref="owner")
-    comments = db.relationship('Comment', backref="owner")
+    rol_user = db.Column(db.Integer,nullable=False)
+    #housings = db.relationship('Housing', backref="owner")
+    #housings = db.relationship('Housing', backref="owner", foreign_keys=['Housing.landlord_id', 'Housing.lessee_id'])
+    #housings = db.relationship('Housing', backref="owner", foreign_keys=[Housing.landlord_id, Housing.lessee_id])
+    housings = db.relationship('Housing', backref="owner", primaryjoin="or_(User.id == Housing.landlord_id, User.id == Housing.lessee_id)")
+    #publications = db.relationship('Publication', backref="owner")
+    #comments = db.relationship('Comment', backref="owner")
     created_at = db.Column(db.DateTime, default=datetime.now())
     updated_at = db.Column(db.DateTime, onupdate=datetime.now())
     
@@ -26,7 +29,7 @@ class User(db.Model):
         super().__init__(**fields)
     
     def __repr__(self) -> str:#Similar a toString()
-        return f"User >>> {self.name}"
+        return f"User >>> {self.name_user}"
     
     def __setattr__(self, name, value):
         if(name == "password"):
@@ -37,20 +40,20 @@ class User(db.Model):
     def hash_password(password):
         return generate_password_hash(password)
     def check_password(self, password):
-        return check_password_hash(self.password_user, password)
+        return check_password_hash(self.password, password)
     
     @staticmethod
-    def hash_password(password_user):
-        if not password_user:
+    def hash_password(password):
+        if not password:
             raise AssertionError('Password not provided')
-        if not re.match('\d.*[A-Z]|[A-Z].*\d', password_user):
+        if not re.match('\d.*[A-Z]|[A-Z].*\d', password):
             raise AssertionError('Password must contain 1 capital letter and 1 number')
-        if len(password_user) < 7 or len(password_user) > 20:
+        if len(password) < 7 or len(password) > 20:
             raise AssertionError('Password must be between 7 and 20 characters')
         
-        return generate_password_hash(password_user)
+        return generate_password_hash(password)
     
-    @validates(id)
+    @validates('id')
     def validate_id(self, key, value):
         if not value:
             raise AssertionError('No id provided')
@@ -63,7 +66,7 @@ class User(db.Model):
         
         return value
     
-    @validates(name_user)
+    @validates('name_user')
     def validate_name_user(self,key,value):
         if not value:
             raise AssertionError('No name provided')
@@ -74,18 +77,17 @@ class User(db.Model):
 
         return value 
     
-    @validates(email)
+    @validates('email')
     def validate_email(self,key,value):
         if not value:
             raise AssertionError('No email provided')
         if not re.match("[^@]+@[^@]+\.[^@]+", value):
             raise AssertionError('Provided email is not an email address')
         if User.query.filter(User.email == value).first():
-            raise AssertionError('Email is already in use')
-        
+            raise AssertionError('Email is already in use')    
         return value
     
-    @validates(phone)
+    @validates('phone')
     def validate_phone(self,key,value):
         if not value:
             raise AssertionError('No phone')
@@ -109,7 +111,7 @@ class User(db.Model):
             raise AssertionError('date birth invalid')
         return value
     
-    @validates(rol_user)
+    @validates('rol_user')
     def validate_rol_user(self, key, value):
         allowed_values = [1, 2, 3]
         if not value:
@@ -126,3 +128,43 @@ class UserSchema(ma.SQLAlchemyAutoSchema):
 
 user_schema = UserSchema()
 users_schema = UserSchema(many=True)
+
+#Error
+# File "C:\Users\GERARDO SANCHEZ\Desktop\Programacion_Backend
+# \backend\proyecto_habitaciones_uam_v1\venv\Lib\site-packages\
+#  sqlalchemy\orm\relationships.py", line 2467, in _determine_joins
+#    raise sa_exc.AmbiguousForeignKeysError(
+#sqlalchemy.exc.AmbiguousForeignKeysError: Could not determine join 
+#condition between parent/child tables on relationship User.housings - 
+#there are multiple foreign key paths linking the tables.  Specify the 
+#'foreign_keys' argument, providing a list of those columns which should 
+#be counted as containing a foreign key reference to the parent table.
+
+
+
+#Posible Solución
+#Cambiar el formato de la linea housings = db.relationship('Housing', backref="owner")
+#por el siguiente formato:housings = db.relationship('Housing', backref='owner', foreign_keys=['Housing.landlord_id', 'Housing.lessee_id'])
+#No Funciono
+
+#Solucion
+#housings = db.relationship('Housing', backref="owner", primaryjoin="or_(User.id == Housing.landlord_id, User.id == Housing.lessee_id)")
+
+#Error
+#File "C:\Users\GERARDO SANCHEZ\Desktop\Programacion_Backend\backend\
+    # proyecto_habitaciones_uam_v1\venv\Lib\site-packages\
+        # sqlalchemy\sql\coercions.py", line 535, 
+        # in _raise_for_expected
+    #raise exc.ArgumentError(msg, code=code) from err
+#sqlalchemy.exc.ArgumentError: Column expression expected for argument 'foreign_keys'; got 'Housing.lessee_id'.
+
+#Posible Solución
+#housings = db.relationship('Housing', backref="owner", foreign_keys=[Housing.landlord_id, Housing.lessee_id])
+
+#Error
+#raise LookupError(
+#sqlalchemy.exc.StatementError: (builtins.LookupError) '1' is not among the defined enum values. Enum name: roluser. Possible values: admin, landlord, less
+#[SQL: INSERT INTO user (name_user, password, email, phone, "dateBirth", rol_user, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)]
+#[parameters: [{'email': 'gery@autonoma.edu.co', 'password': 'pbkdf2:sha256:260000$ppeSVofQ1gTFOQnS$72f2bf344e5ae6b2895ee7a0fa6cd11f3f6b781b83b8d3db3c58661a66178f02', 'rol_user': 1, 'phone': '3004966437', 'dateBirth': datetime.date(2000, 5, 18), 'name_user': 'geryy', 'updated_at': None}]]
+
+

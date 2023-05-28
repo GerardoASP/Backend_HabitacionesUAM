@@ -1,6 +1,5 @@
 from datetime import datetime
 from src.database import db, ma
-from src.models.user import User
 from sqlalchemy.orm import validates
 import re
 
@@ -88,28 +87,22 @@ class Housing(db.Model):
     
     @validates(landlord_id)
     def validate_landlord_id(self, key, value):
-        user = User.query.get(value)
         if not value:
             raise AssertionError('No fk_landlord_id provided')
         if not re.compile("^[-+]?[0-9]+$", value):
             raise AssertionError('The value must be an integer')
         if value <= 0:
             raise AssertionError('fk_landlord_id invalid')
-        if not user:
-            raise AssertionError('fk_landlord_id does not exist')
         return value
     
     @validates(lessee_id)
     def validate_lessee_id(self, key, value):
-        user = User.query.get(value)
         if not value:
             raise value
         if not re.compile("^[-+]?[0-9]+$", value):
             raise AssertionError('The value must be an integer')
         if value <= 0:
             raise AssertionError('lessee_id invalid')
-        if not user:
-            raise AssertionError('lessee_id does not exist')
         return value
     
     @validates(stratum)
