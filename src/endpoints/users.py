@@ -1,4 +1,4 @@
-from flask import Blueprint, request
+from flask import Blueprint, request,abort
 from http import HTTPStatus
 import sqlalchemy.exc
 import werkzeug
@@ -10,7 +10,13 @@ users = Blueprint("users",__name__,url_prefix="/api/v1/users")
 
 @users.get("/")
 def read_all():
-    users = User.query.order_by(User.name_user).all() 
+    rol_user = request.args.get("rol_user")
+    if rol_user is not None:
+        users = User.query.filter_by(rol_user=int(rol_user)).order_by(User.name_user).all()
+    else:
+        users = User.query.order_by(User.name_user).all()
+    if not users:
+        abort(HTTPStatus.NOT_FOUND)
     return {"data": users_schema.dump(users)}, HTTPStatus.OK
 
 @users.get("/<int:id>")
@@ -60,12 +66,12 @@ def update(id):
     date_birth_request = request.get_json().get("dateBirth", None)
     date_birth = datetime.strptime(date_birth_request, '%Y-%m-%d').date()
     
-    user.name_user = request.get_json().get('name_user', user.name_user)
-    user.password = request.get_json().get('password', user.password)
-    user.email = request.get_json().get('email', user.email)
-    user.phone = request.get_json().get('phone', user.phone)
+    user.name_user = request.get_json().get("name_user", user.name_user)
+    user.password = request.get_json().get("password", user.password)
+    user.email = request.get_json().get("email", user.email)
+    user.phone = request.get_json().get("phone", user.phone)
     user.dateBirth =  date_birth
-    user.rol_user = request.get_json().get('rol_user', user.rol_user)
+    user.rol_user = request.get_json().get("rol_user", user.rol_user)
     
     try:
         db.session.commit()

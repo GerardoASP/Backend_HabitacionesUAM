@@ -1,78 +1,111 @@
-from flask import Blueprint,request
-housings = Blueprint("housings",__name__,url_prefix="/api/v1/housings")
+from flask import Blueprint, request,abort
 from http import HTTPStatus
+import sqlalchemy.exc
+import werkzeug
+from datetime import datetime
+from src.database import db
+from src.models.housing import Housing,housing_schema,housings_schema
 
-product_data = [
- {"id": 1, "state": "Available", "categoryHou": 1, "stratum": "3","value":340000,"description":"","altitude":"37.7749° N","latitude":"122.4194° O","fkidUser":None},
- {"id": 2, "state": "Available", "categoryHou": 2, "stratum": "3","value":350000,"description":"","altitude":"36.7749° N","latitude":"132.4194° O","fkidUser":None},
- {"id": 3, "state": "Available", "categoryHou": 3, "stratum": "3","value":300000,"description":"","altitude":"47.7749° N","latitude":"112.4194° O","fkidUser":None},
- {"id": 4, "state": "Not available", "categoryHou": 4, "stratum": "2","value":230000,"description":"","altitude":"37.7748° N","latitude":"100.4194° O","fkidUser":None},
- {"id": 5, "state": "Not available", "categoryHou": 1, "stratum": "2","value":250000,"description":"","altitude":"32.7749° N","latitude":"22.4194° O","fkidUser":None},
-];
+housings = Blueprint("housings",__name__,url_prefix="/api/v1/housings")
 
 @housings.get("/")
 def read_all():
-    return {"data": product_data}, HTTPStatus.OK
+    housings = Housing.query.order_by(Housing.description).all() 
+    return {"data": housings_schema.dump(housings)}, HTTPStatus.OK
 
-@housings.get("/")
+@housings.get("/available")
 def read_available_housings():
-    query_state = request.args.get('state')
+    housings = Housing.query.filter_by(state="available").order_by(Housing.description).all()
+    return {"data": housings_schema.dump(housings)}, HTTPStatus.OK
 
-@housings.get("/")
-def read_lesse_user_housings():
-    query_fore_key = request.args.get('fk_idUser')
-    query_rol = request.args.get('rolUser')
-    
+@housings.get("/not_available")
+def read_not_available_housings():
+    housings = Housing.query.filter_by(state="not available").order_by(Housing.description).all()
+    return {"data": housings_schema.dump(housings)}, HTTPStatus.OK
+
+
 @housings.get("/<int:id>")
 def read_one(id):
-    for product in product_data:
-      if product['id'] == id:
-        return {"data": product}, HTTPStatus.OK
-    return {"error": "Resource not found"}, HTTPStatus.NOT_FOUND
+    housing = Housing.query.filter_by(id=id).first()
+    if(not housing):
+        return {"error": "Resource not found"}, HTTPStatus.NOT_FOUND
+    return {"data": housing_schema.dump(housing)}, HTTPStatus.OK
+
+@housings.get("/user/<int:landlord_id>")
+def read_one_two(landlord_id):
+    
+    housing = Housing.query.filter_by(landlord_id=landlord_id).all()
+
+    if (not housing):
+        return {"error": "Resource not found"}, HTTPStatus.NOT_FOUND
+
+    return {"data": housings_schema.dump(housing)}, HTTPStatus.OK
+
 
 @housings.post("/")
 def create():
-    post_data = request.get_json()
- 
-    product = {
-        "id": len(product_data) + 1, 
-        "state": post_data.get('state', 'Available'), 
-        "categoryHou": post_data.get('categoryHou', None), 
-        "stratum": post_data.get('stratum', None),
-        "value": post_data.get('value',0),
-        "description": post_data.get('description',None),
-        "altitude": post_data.get('altitude',None),
-        "latitude": post_data.get('latitude',None),
-        "fkidUser": post_data.get('fkidUser',None),
-    }
- 
-    product_data.append(product)
- 
-    return {"data": product}, HTTPStatus.CREATED
+    post_data = None
+    try:
+        post_data = request.get_json()
+    except werkzeug.exceptions.BadRequest as e:
+        return {"error": "Post body JSON data not found","message": str(e)}, HTTPStatus.BAD_REQUEST
+    # Housing.id is auto increment! 
+    housing = Housing(stratum = request.get_json().get("stratum", None),
+        description = request.get_json().get("description", None),
+        state = request.get_json().get("state", None),
+        value = request.get_json().get("value", None),
+        latitude = request.get_json().get("latitude", None),
+        altitude = request.get_json().get("altitude", None),
+        video = request.get_json().get("video", None),
+        landlord_id = request.get_json().get("landlord_id", None),
+        lessee_id = request.get_json().get("lessee_id", None))
+
+    try:
+        db.session.add(housing)
+        db.session.commit()
+    except sqlalchemy.exc.IntegrityError as e:
+        return {"error": "Invalid resource values","message": str(e)}, HTTPStatus.BAD_REQUEST
+
+    return {"data": housing_schema.dump(housing)}, HTTPStatus.CREATED
+
 @housings.put('/<int:id>')
 @housings.patch('/<int:id>')
 def update(id):
-    post_data = request.get_json()
-    for i in range(len(product_data)):
-      if product_data[i]['id'] == id:
-        product_data[i] = {
-            "id": id,
-            "state": post_data.get('state'), 
-            "categoryHou": post_data.get('categoryHou'), 
-            "stratum": post_data.get('stratum'),
-            "value": post_data.get('value'),
-            "description": post_data.get('description'),
-            "altitude": post_data.get('altitude'),
-            "latitude": post_data.get('latitude')
-        }
-        return {"data": product_data[i]}, HTTPStatus.OK
-    return {"error": "Resource not found"}, HTTPStatus.NOT_FOUND
+    post_data = None
+    try:
+        post_data = request.get_json()
+    except werkzeug.exceptions.BadRequest as e:
+        return {"error": "Put body JSON data not found","message": str(e)}, HTTPStatus.BAD_REQUEST
+    housing = Housing.query.filter_by(id=id).first()
+    if(not housing):
+        return {"error": "Resource not found"}, HTTPStatus.NOT_FOUND
+    
+    housing.stratum = request.get_json().get("stratum", housing.stratum)
+    housing.description = request.get_json().get("description", housing.description)
+    housing.state = request.get_json().get("state", housing.state)
+    housing.value = request.get_json().get("value", housing.value)
+    housing.latitude = request.get_json().get("latitude", housing.latitude)
+    housing.altitude = request.get_json().get("altitude", housing.altitude)
+    housing.video = request.get_json().get("video", housing.video)
+    housing.landlord_id = request.get_json().get("landlord_id", housing.landlord_id)
+    housing.lessee_id = request.get_json().get("lessee_id", housing.lessee_id)
+    try:
+        db.session.commit()
+    except sqlalchemy.exc.IntegrityError as e:
+        return {"error": "Invalid resource values","message": str(e)}, HTTPStatus.BAD_REQUEST
+    return {"data": housing_schema.dump(housing)}, HTTPStatus.OK
 
 @housings.delete("/<int:id>")
 def delete(id):
-    for i in range(len(product_data)):
-        if product_data[i]['id'] == id:
-            del product_data[i]
-            return {"data": ""}, HTTPStatus.NO_CONTENT
-    return {"error": "Resource not found"}, HTTPStatus.NOT_FOUND
+    housing = Housing.query.filter_by(id=id).first()
+    if(not housing):
+        return {"error": "Resource not found"}, HTTPStatus.NOT_FOUND
+    try:
+        db.session.delete(housing)
+        db.session.commit()
+    except sqlalchemy.exc.IntegrityError as e:
+        return {"error": "Resource could not be deleted","message": str(e)}, HTTPStatus.BAD_REQUEST
+    return {"data": ""}, HTTPStatus.NO_CONTENT
+
+
 
